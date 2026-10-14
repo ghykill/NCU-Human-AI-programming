@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="170" viewBox="0 0 640 170">
+  <rect width="640" height="170" rx="14" fill="#003a70"/>
+  <rect x="0" y="0" width="8" height="170" rx="4" fill="#c8a24b"/>
+  <text x="320" y="70" font-family="'Microsoft YaHei','PingFang SC',sans-serif" font-size="46" font-weight="bold" fill="#ffffff" text-anchor="middle">南昌大学</text>
+  <text x="320" y="108" font-family="Arial,Helvetica,sans-serif" font-size="19" letter-spacing="4" fill="#cfd8e3" text-anchor="middle">NANCHANG UNIVERSITY</text>
+  <text x="320" y="142" font-family="'Microsoft YaHei',sans-serif" font-size="16" fill="#9fb3c8" text-anchor="middle">格物致新 · 厚德泽人</text>
+</svg>
