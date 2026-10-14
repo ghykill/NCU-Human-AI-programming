@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>双摆混沌模拟器 · 南昌大学 · 甘昊宇</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #1a1a24;
+    overscroll-behavior: none;
+  }
+  canvas { display: block; width: 100vw; height: 100vh; height: 100dvh; touch-action: none; }
+  .hud {
+    position: fixed;
+    top: 18px;
+    left: 22px;
+    color: #7f93b3;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.95;
+    user-select: none;
+    pointer-events: none;
+  }
+  .hud h1 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: #9fd8ff;
+  }
+  .hud .val { color: #d9e6ff; }
+  .hud .accent { color: #4fd1ff; }
+  .hud .sub {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #55637d;
+    letter-spacing: 0.5px;
+  }
+  .panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 14px 36px;
+    padding: 14px 22px 16px;
+    background: rgba(26, 26, 36, 0.92);
+    border-top: 1px solid rgba(110, 140, 190, 0.22);
+    backdrop-filter: blur(6px);
+    font-family: Consolas, "Courier New", monospace;
+    user-select: none;
+  }
+  .panel .ctrl {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 172px;
+  }
+  .panel .ctrl label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    color: #8fa3bf;
+  }
+  .panel .ctrl label .val { color: #4fd1ff; }
+  .panel input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: #2c3550;
+    outline: none;
+  }
+  .panel input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #4fd1ff;
+    box-shadow: 0 0 8px rgba(79, 209, 255, 0.8);
+    cursor: pointer;
+  }
+  .panel input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: none;
+    border-radius: 50%;
+    background: #4fd1ff;
+    box-shadow: 0 0 8px rgba(79, 209, 255, 0.8);
+    cursor: pointer;
+  }
+  .panel button {
+    padding: 8px 20px;
+    border: 1px solid rgba(79, 209, 255, 0.45);
+    border-radius: 6px;
+    background: #232b3d;
+    color: #9fd8ff;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 1px;
+    cursor: pointer;
+  }
+  .panel button:hover {
+    background: #2b3550;
+    box-shadow: 0 0 10px rgba(79, 209, 255, 0.35);
+  }
+  .panel button:active { transform: translateY(1px); }
+  .presets {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .presets-label {
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    color: #8fa3bf;
+    margin-right: 2px;
+  }
+  .panel .pill {
+    padding: 5px 14px;
+    border: 1px solid rgba(79, 209, 255, 0.35);
+    border-radius: 999px;
+    background: #1f2738;
+    color: #9fd8ff;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+  .panel .pill:hover {
+    background: #2b3550;
+    box-shadow: 0 0 8px rgba(79, 209, 255, 0.3);
+  }
+  .panel .pill.active {
+    background: rgba(79, 209, 255, 0.22);
+    border-color: #4fd1ff;
+    box-shadow: 0 0 10px rgba(79, 209, 255, 0.55);
+    color: #d9f4ff;
+  }
+
+  /* 移动端 / 窄屏响应式适配 */
+  @media (max-width: 640px) {
+    .hud { top: 10px; left: 12px; font-size: 11px; line-height: 1.8; }
+    .hud h1 { font-size: 13px; }
+    .panel { gap: 10px 16px; padding: 10px 12px 12px; }
+    .panel .ctrl { min-width: 108px; }
+    .panel button { padding: 6px 14px; font-size: 12px; }
+    .panel .pill { padding: 4px 11px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hud">
+  <h1>双摆混沌模拟器</h1>
+  <div>摆长 L₁ = L₂ = <span class="val" id="hudLen">200 px（每段 2.0 m）</span></div>
+  <div>重力加速度 g = <span class="val" id="hudG">9.8 m/s²</span></div>
+  <div>系统能量 E = <span class="val" id="energyVal">--</span> J（阻尼 0 时守恒）</div>
+  <div>当前摆角 θ₁ / θ₂ = <span class="accent" id="angleVal">120.0° / 120.0°</span></div>
+  <div class="sub">南昌大学 · 人机协同与 AI 编程 · 甘昊宇（5715126004）</div>
+</div>
+
+<canvas id="cv"></canvas>
+
+<div class="panel">
+  <div class="ctrl">
+    <label for="lenSlider">摆长 L₁ = L₂ <span class="val" id="lenVal">200 px</span></label>
+    <input type="range" id="lenSlider" min="100" max="350" step="1" value="200">
+  </div>
+  <div class="ctrl">
+    <label for="gSlider">重力 g <span class="val" id="gVal">9.8</span></label>
+    <input type="range" id="gSlider" min="0" max="25" step="0.01" value="9.8">
+  </div>
+  <div class="ctrl">
+    <label for="dampSlider">阻尼系数 <span class="val" id="dampVal">0.000</span></label>
+    <input type="range" id="dampSlider" min="0" max="0.01" step="0.001" value="0">
+  </div>
+  <div class="presets" id="presets">
+    <span class="presets-label">重力场景</span>
+    <button class="pill" id="btnEarth" type="button">地球</button>
+    <button class="pill" id="btnMoon" type="button">月球</button>
+    <button class="pill" id="btnJupiter" type="button">木星</button>
+    <button class="pill" id="btnSpace" type="button">太空</button>
+  </div>
+  <button id="resetBtn" type="button">重置摆动</button>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ================= 物理参数（双摆，支持实时调节） ================= */
+  const PX_PER_METER = 100;              // 比例尺：100 像素 = 1 米
+  const M1 = 1, M2 = 1;                  // 上、下摆球质量（kg），等质量经典配置
+  const DAMP_SCALE = 60;                 // 阻尼标定：滑块值 × 60 折算为每秒阻尼系数
+  const H_STEP = 1 / 240;                // 物理固定步长：240 Hz，保证 RK4 稳定
+
+  const THETA1_0 = 120 * Math.PI / 180;  // 初始摆角 θ₁₀ = 120°（高位释放，保证混沌翻转）
+  const THETA2_0 = 120 * Math.PI / 180;  // 初始摆角 θ₂₀ = 120°
+
+  let L_PX = 200;                        // 每段摆长（像素），滑块范围 100 ~ 350
+  let G = 9.8;                           // 重力加速度（m/s²），滑块范围 1 ~ 25
+  let damping = 0;                       // 阻尼滑块值
+  let dampC = damping * DAMP_SCALE;      // 折算后的阻尼系数（1/s）
+  let gTarget = G;                       // 重力过渡目标值（场景切换时使用）
+
+  // 状态向量 [θ1, ω1, θ2, ω2]
+  let state = [THETA1_0, 0, THETA2_0, 0];
+
+  function armMeters() { return L_PX / PX_PER_METER; }
+
+  /* ================= 双摆拉格朗日运动方程 =================
+     两自由度双摆，由拉格朗日量 L = T − V 推导出的 θ₁″、θ₂″ 显式表达式 */
+  function derivatives(s) {
+    const t1 = s[0], w1 = s[1], t2 = s[2], w2 = s[3];
+    const L = armMeters();
+    const d = t1 - t2;
+    const sinD = Math.sin(d), cosD = Math.cos(d);
+    const den = 2 * M1 + M2 - M2 * Math.cos(2 * d);
+    const a1 = (-G * (2 * M1 + M2) * Math.sin(t1)
+                - M2 * G * Math.sin(t1 - 2 * t2)
+                - 2 * sinD * M2 * (w2 * w2 * L + w1 * w1 * L * cosD)) / (L * den);
+    const a2 = (2 * sinD * (w1 * w1 * L * (M1 + M2)
+                + G * (M1 + M2) * Math.cos(t1)
+                + w2 * w2 * L * M2 * cosD)) / (L * den);
+    // 角速度各减去阻尼项
+    return [w1, a1 - dampC * w1, w2, a2 - dampC * w2];
+  }
+
+  /* ================= 四阶龙格-库塔（RK4）数值积分 ================= */
+  function rk4(s, h) {
+    const add = function (a, k, f) {
+      return [a[0] + f * k[0], a[1] + f * k[1], a[2] + f * k[2], a[3] + f * k[3]];
+    };
+    const k1 = derivatives(s);
+    const k2 = derivatives(add(s, k1, h / 2));
+    const k3 = derivatives(add(s, k2, h / 2));
+    const k4 = derivatives(add(s, k3, h));
+    const out = [];
+    for (let i = 0; i < 4; i++) {
+      out[i] = s[i] + h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
+    }
+    return out;
+  }
+
+  /* ================= 画布初始化 ================= */
+  const canvas = document.getElementById('cv');
+  const ctx = canvas.getContext('2d');
+  const angleEl = document.getElementById('angleVal');
+  const energyEl = document.getElementById('energyVal');
+  const hudLenEl = document.getElementById('hudLen');
+  const hudGEl = document.getElementById('hudG');
+
+  /* ================= 控制面板（实时交互） ================= */
+  const lenSlider = document.getElementById('lenSlider');
+  const gSlider = document.getElementById('gSlider');
+  const dampSlider = document.getElementById('dampSlider');
+  const lenVal = document.getElementById('lenVal');
+  const gVal = document.getElementById('gVal');
+  const dampVal = document.getElementById('dampVal');
+  const resetBtn = document.getElementById('resetBtn');
+
+  // 重力显示格式：最多两位小数、自动去掉多余的 0（9.8 / 1.62 / 24.79 / 0）
+  function fmtG(v) { return String(+v.toFixed(2)); }
+
+  // 把当前参数同步到滑块标签与 HUD
+  function syncHUD() {
+    lenVal.textContent = L_PX + ' px';
+    gVal.textContent = fmtG(G);
+    dampVal.textContent = damping.toFixed(3);
+    hudLenEl.textContent = L_PX + ' px（每段 ' + (L_PX / PX_PER_METER).toFixed(1) + ' m）';
+    hudGEl.textContent = fmtG(G) + ' m/s²';
+  }
+
+  /* ================= 天体场景预设（点击后重力平滑过渡） ================= */
+  const PRESETS = [
+    { name: '地球', g: 9.8,   id: 'btnEarth' },
+    { name: '月球', g: 1.62,  id: 'btnMoon' },
+    { name: '木星', g: 24.79, id: 'btnJupiter' },
+    { name: '太空', g: 0,     id: 'btnSpace' }
+  ];
+  const presetBtns = [];
+  for (let i = 0; i < PRESETS.length; i++) {
+    (function (preset) {
+      const btn = document.getElementById(preset.id);
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        gTarget = preset.g;   // 只设置目标值，由主循环平滑过渡并同步滑块
+        updatePresetUI();
+        saveConfig();
+      });
+      presetBtns.push({ g: preset.g, btn: btn });
+    })(PRESETS[i]);
+  }
+
+  function updatePresetUI() {
+    for (let i = 0; i < presetBtns.length; i++) {
+      presetBtns[i].btn.classList.toggle('active',
+        Math.abs(gTarget - presetBtns[i].g) < 0.01);
+    }
+  }
+
+  /* ================= 参数持久化（localStorage 自动保存 / 恢复） ================= */
+  const CFG_KEY = 'ncu-double-pendulum-config-v1';
+
+  function saveConfig() {
+    try {
+      localStorage.setItem(CFG_KEY, JSON.stringify({
+        L: L_PX, g: gTarget, damping: damping
+      }));
+    } catch (e) { /* 隐私模式等场景下静默失败，不影响使用 */ }
+  }
+
+  function loadConfig() {
+    try {
+      const raw = localStorage.getItem(CFG_KEY);
+      if (!raw) return null;
+      const cfg = JSON.parse(raw);
+      return (cfg && typeof cfg === 'object') ? cfg : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // 启动时恢复上次参数（带范围校验）
+  const savedCfg = loadConfig();
+  if (savedCfg) {
+    if (isFinite(savedCfg.L))       L_PX = Math.min(350, Math.max(100, savedCfg.L));
+    if (isFinite(savedCfg.g))       { gTarget = Math.min(25, Math.max(0, savedCfg.g)); G = gTarget; }
+    if (isFinite(savedCfg.damping)) { damping = Math.min(0.01, Math.max(0, savedCfg.damping)); dampC = damping * DAMP_SCALE; }
+    lenSlider.value = L_PX;
+    gSlider.value = G;
+    dampSlider.value = damping;
+  }
+
+  lenSlider.addEventListener('input', function () {
+    L_PX = Number(lenSlider.value);
+    trail.length = 0;            // 摆长变化后旧拖尾失效，清空重画
+    syncHUD();
+    saveConfig();
+  });
+
+  gSlider.addEventListener('input', function () {
+    G = Number(gSlider.value);
+    gTarget = G;                 // 手动拖动即取消进行中的过渡
+    syncHUD();
+    updatePresetUI();
+    saveConfig();
+  });
+
+  dampSlider.addEventListener('input', function () {
+    damping = Number(dampSlider.value);
+    dampC = damping * DAMP_SCALE;
+    syncHUD();
+    saveConfig();
+  });
+
+  /* 重置摆动：具名函数定义在 IIFE 闭包作用域内，并在同一作用域内用
+     addEventListener 绑定。不要改成内联 onclick="resetAnimation()"，
+     它在全局作用域执行会抛 ReferenceError */
+  function resetAnimation() {
+    state = [THETA1_0, 0, THETA2_0, 0];   // 精准回到初始摆角，从静止释放
+    dragging = 0;
+    acc = 0;
+    lastTs = null;
+    simTime = 0;
+    trail.length = 0;
+    updateReadout();         // 复位后立即刷新读数
+    syncHUD();
+  }
+
+  resetBtn.addEventListener('click', resetAnimation);
+  syncHUD();
+  updatePresetUI();
+
+  let W = 0, H = 0;
+
+  /* ================= 彩虹拖尾 ================= */
+  const trail = [];
+  const TRAIL_MAX = 120;
+
+  let panelH = 118;            // 控制面板实际高度（移动端更高，用于画面避让）
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // 高分屏下保证线条清晰
+    const panelEl = document.querySelector('.panel');
+    if (panelEl && panelEl.offsetHeight) panelH = panelEl.offsetHeight + 8;
+    trail.length = 0;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // 悬挂点：兼顾“摆动到底部不压住面板”与“初始高位摆球可见”
+  function pivot() {
+    const reach = 2 * L_PX;
+    const initDrop = 2 * L_PX * Math.max(0, -Math.cos(THETA1_0), -Math.cos(THETA2_0));
+    const minY = 60 + initDrop;
+    const fitTop = H - panelH - reach - 50;
+    return { x: W / 2, y: Math.max(minY, Math.min(H * 0.30, fitTop)) };
+  }
+
+  function bobPositions(s, p) {
+    const x1 = p.x + L_PX * Math.sin(s[0]);
+    const y1 = p.y + L_PX * Math.cos(s[0]);
+    return {
+      x1: x1, y1: y1,
+      x2: x1 + L_PX * Math.sin(s[2]),
+      y2: y1 + L_PX * Math.cos(s[2])
+    };
+  }
+
+  /* ================= 绘制 ================= */
+  function drawBackground() {
+    ctx.fillStyle = '#1a1a24';           // 深灰科技色背景
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // 半透明彩虹渐变衰减拖尾（仅第二个摆球）
+  function drawTrail() {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter'; // 叠加发光
+    for (let i = 0; i < trail.length; i++) {
+      const k = (i + 1) / trail.length;       // 越新越亮
+      ctx.fillStyle = 'hsla(' + trail[i].hue.toFixed(1) + ', 100%, 62%, '
+                    + (0.42 * k * k).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.arc(trail[i].x, trail[i].y, 3.4 + 1.6 * k, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawSegment(xa, ya, xb, yb, color) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(xa, ya);
+    ctx.lineTo(xb, yb);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawPivot(p) {
+    ctx.save();
+    ctx.fillStyle = '#9fb6d8';
+    ctx.shadowColor = 'rgba(120, 190, 255, 0.85)';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 摆球：微弱发光光效（r 为半径，上球小、下球大）
+  function drawBall(bx, by, r) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const glowR = r * 3.1;
+    const glow = ctx.createRadialGradient(bx, by, 0, bx, by, glowR);
+    glow.addColorStop(0, 'rgba(90, 220, 255, 0.50)');
+    glow.addColorStop(0.45, 'rgba(70, 190, 255, 0.15)');
+    glow.addColorStop(1, 'rgba(70, 190, 255, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(bx, by, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    const ball = ctx.createRadialGradient(bx - r * 0.27, by - r * 0.33, Math.max(1, r * 0.13), bx, by, r);
+    ball.addColorStop(0, '#eaffff');
+    ball.addColorStop(0.35, '#9fe8ff');
+    ball.addColorStop(1, '#2fb6e8');
+    ctx.fillStyle = ball;
+    ctx.shadowColor = 'rgba(79, 209, 255, 0.9)';
+    ctx.shadowBlur = r * 1.5;
+    ctx.beginPath();
+    ctx.arc(bx, by, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* ================= 系统能量（数值稳定性监视） ================= */
+  function energy(s) {
+    const L = armMeters();
+    const y1 = L * Math.cos(s[0]);
+    const y2 = y1 + L * Math.cos(s[2]);
+    const v1sq = (L * s[1]) * (L * s[1]);
+    const v2sq = v1sq + (L * s[3]) * (L * s[3])
+               + 2 * L * L * s[1] * s[3] * Math.cos(s[0] - s[2]);
+    const ke = 0.5 * M1 * v1sq + 0.5 * M2 * v2sq;
+    const pe = G * (M1 * (L - y1) + M2 * (2 * L - y2));
+    return ke + pe;
+  }
+
+  /* ================= HUD 读数即时刷新（拖拽、复位时不等下一帧） ================= */
+  function updateReadout() {
+    angleEl.textContent = deg(state[0]) + ' / ' + deg(state[2]);
+    energyEl.textContent = energy(state).toFixed(2);
+  }
+
+  /* ================= 鼠标 / 触屏拖拽摆球（改变初始角度并释放） ================= */
+  // 触屏设备（pointer: coarse）加大命中半径，方便手指操作
+  const coarsePointer = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  const HIT_R2 = coarsePointer ? 44 : 30;
+  const HIT_R1 = coarsePointer ? 40 : 26;
+
+  let dragging = 0;        // 0 = 未拖拽；1 = 拖上摆球；2 = 拖下摆球
+
+  function pointerPos(ev) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+  }
+
+  canvas.addEventListener('pointerdown', function (ev) {
+    const m = pointerPos(ev);
+    const b = bobPositions(state, pivot());
+    if (Math.hypot(m.x - b.x2, m.y - b.y2) < HIT_R2) {
+      dragging = 2;
+    } else if (Math.hypot(m.x - b.x1, m.y - b.y1) < HIT_R1) {
+      dragging = 1;
+    } else {
+      return;
+    }
+    state[1] = 0;            // 拖拽期间冻结速度
+    state[3] = 0;
+    trail.length = 0;
+    canvas.style.cursor = 'grabbing';
+  });
+
+  window.addEventListener('pointermove', function (ev) {
+    const m = pointerPos(ev);
+    if (dragging) {
+      const p = pivot();
+      if (dragging === 1) {
+        state[0] = Math.atan2(m.x - p.x, m.y - p.y);     // 上摆角直接跟随鼠标
+      } else {
+        const b = bobPositions(state, p);
+        state[2] = Math.atan2(m.x - b.x1, m.y - b.y1);   // 下摆角相对上摆球
+      }
+      state[1] = 0;
+      state[3] = 0;
+      updateReadout();       // 拖拽时即时刷新读数（不必等下一帧）
+    } else {
+      const b = bobPositions(state, pivot());
+      const near = Math.hypot(m.x - b.x2, m.y - b.y2) < HIT_R2
+                || Math.hypot(m.x - b.x1, m.y - b.y1) < HIT_R1;
+      canvas.style.cursor = near ? 'grab' : 'default';
+    }
+  });
+
+  window.addEventListener('pointerup', function () {
+    if (!dragging) return;
+    dragging = 0;            // 释放：从当前角度、静止状态开始积分
+    state[1] = 0;
+    state[3] = 0;
+    acc = 0;
+    canvas.style.cursor = 'grab';
+  });
+
+  /* ================= 主循环（requestAnimationFrame + RK4） ================= */
+  let acc = 0;               // 物理时间累加器
+  let lastTs = null;
+  let simTime = 0;           // 仿真时间（秒），用于彩虹相位流动
+
+  function deg(rad) { return (rad * 180 / Math.PI).toFixed(1) + '°'; }
+
+  function frame(ts) {
+    if (lastTs === null) lastTs = ts;
+    let dt = (ts - lastTs) / 1000;
+    lastTs = ts;
+    if (dt > 0.1) dt = 0.1;  // 切回标签页时避免大跳变
+    if (dt < 0) dt = 0;
+
+    // 场景切换：重力平滑过渡到目标值，并实时同步滑块与标签
+    if (Math.abs(G - gTarget) > 1e-3) {
+      const k = 1 - Math.exp(-dt / 0.16);   // 时间常数 0.16 s，指数趋近
+      G += (gTarget - G) * k;
+      if (Math.abs(gTarget - G) < 0.005) G = gTarget;
+      gSlider.value = G;
+      syncHUD();
+    }
+
+    if (dragging) {
+      acc = 0;               // 拖拽时冻结物理，只跟随鼠标
+    } else {
+      simTime += dt;
+      acc += dt;
+      while (acc >= H_STEP) {
+        state = rk4(state, H_STEP);
+        acc -= H_STEP;
+      }
+    }
+
+    const p = pivot();
+    const b = bobPositions(state, p);
+
+    // 第二个摆球的彩虹拖尾：hue 随时间流动，alpha 随点年龄衰减
+    trail.push({ x: b.x2, y: b.y2, hue: (simTime * 60) % 360 });
+    if (trail.length > TRAIL_MAX) trail.shift();
+
+    // 逐层绘制
+    drawBackground();
+    drawTrail();
+    drawSegment(p.x, p.y, b.x1, b.y1, 'rgba(150, 175, 210, 0.75)');
+    drawSegment(b.x1, b.y1, b.x2, b.y2, 'rgba(170, 195, 230, 0.85)');
+    drawPivot(p);
+    drawBall(b.x1, b.y1, 11);
+    drawBall(b.x2, b.y2, 15);
+
+    // 更新 HUD：摆角与系统能量
+    updateReadout();
+
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
