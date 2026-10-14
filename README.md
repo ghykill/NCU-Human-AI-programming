@@ -47,6 +47,9 @@ NCU-Human-AI-programming/
 │   └── README.md
 ├── week05-files-and-data/           # 第 05 周：文件与数据处理
 │   └── README.md
+├── week05-pendulum-sim/             # 第 05 周实验：双摆混沌模拟器（单文件交互应用）
+│   ├── README.md                    # 实验报告（含人机协同三反思）
+│   └── index.html                   # 最终交付的单文件应用
 ├── week06-numpy/                    # 第 06 周：NumPy 科学计算
 │   └── README.md
 ├── week07-matplotlib/               # 第 07 周：Matplotlib 数据可视化
